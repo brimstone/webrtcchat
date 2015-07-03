@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="simplewebrtc.js"></script> 
+    </head>
+    <body bgcolor="blue">
+<div id="chatWindow" style="border: 1px solid black; position: absolute; bottom: 0px; left: 0px; padding: 5px; margin: 2px; background: white;">
+	<div id="join">
+		<input type="text" id="mynick" length="8" />
+		<input type="button" value="Join Chat" onClick="joinChat()" />
+	</div>
+	<div id="users"></div>
+</div>
+<script>
+var me = {};
+
+var users = {};
+
+var webrtc = new SimpleWebRTC({
+    // the id/element dom element that will hold "our" video 
+    localVideoEl: '',
+    // the id/element dom element that will hold remote videos 
+    remoteVideosEl: '',
+    // immediately ask for camera access 
+    autoRequestMedia: false,
+	receiveMedia: {
+        mandatory: {
+            OfferToReceiveAudio: false,
+            OfferToReceiveVideo: false
+        }
+    }
+});
+
+webrtc.on("channelMessage", function(peer, label, data){
+	console.log(peer, data.type);
+	if (data.type == "ping") {
+		peer.sendDirectly("chat", "pong");
+	}
+	if (label == "peer"){
+		users[peer.id] = data.type;
+		updateUser(peer);
+	}
+});
+webrtc.on("channelOpen", function(label){
+	console.log("Channel", label, "open");
+	if (label.label == "peer") {
+		webrtc.sendDirectlyToAll("peer", me);
+	}
+});
+
+webrtc.on('*', console.log);
+
+webrtc.on('createdPeer', function(peer){
+	document.getElementById("join").hidden = true;
+	console.log(peer.sendDirectly);
+	window.peer = peer;
+	console.log(peer.sendDirectly("peer", me));
+	updateUser(peer);
+});
+
+webrtc.on('peerStreamRemoved', function(peer){
+	updateUsers();
+});
+
+
+function updateUser(peer){
+	var userid = "user-" + peer.id;
+	var userobj = document.getElementById(userid);
+	if (!users[peer.id]) {
+		return
+	}
+	if (!userobj) {
+		userobj = document.createElement("div");
+		userobj.id="user-" + peer.id;
+		document.getElementById("users").appendChild(userobj);
+	}
+	userobj.innerHTML="User: " + users[peer.id].nick;
+}
+
+function updateUsers(){
+	var peers = webrtc.getPeers();
+	document.getElementById("users").innerHTML="";
+	for (var p = 0; p < peers.length; p++) {
+		updateUser(peers[p]);
+	}
+}
+
+webrtc.on('joined', function(room) {
+	webrtc.sendDirectlyToAll("meta", me);
+});
+
+function joinChat(){
+	me.nick = document.getElementById("mynick").value;
+	webrtc.joinRoom('your awesome room name');
+	document.getElementById("join").innerHTML="No users";
+}
+
+</script>
+<script src="/livereload.js"></script>
+    </body>
+</html>
